@@ -1,4 +1,4 @@
- # Bitcoin Implementation in Rust
+ # Bitcoin in Rust
 
  This repository contains a Rust-based implementation of a simplified Bitcoin-like blockchain system,
  inspired by the work of [RajputGarima/Bitcoin](https://github.com/RajputGarima/Bitcoin).
