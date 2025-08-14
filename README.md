@@ -7,12 +7,12 @@
  UTXO (Unspent Transaction Output) tracking, and Merkle trees.
 
  ## Features
- - **Node Network**: Multiple nodes running concurrently, each with multiple wallet addresses using RSA cryptography.
- - **Blockchain**: Implements a blockchain with genesis block creation and block linking using hashes.
- - **Transactions**: Supports transaction creation, validation, and UTXO management with digital signatures.
- - **Proof of Work**: Simple proof-of-work mechanism to secure the blockchain.
- - **Merkle Trees**: Efficient data structure for transaction verification.
- - **Console Output**: Pretty-printed tables for transaction and UTXO states.
+ - [x] **Node Network**: Multiple nodes running concurrently, each with multiple wallet addresses using RSA cryptography.
+ - [x] **Blockchain**: Implements a blockchain with genesis block creation and block linking using hashes.
+ - [x] **Transactions**: Supports transaction creation, validation, and UTXO management with digital signatures.
+ - [x] **Proof of Work**: Simple proof-of-work mechanism to secure the blockchain.
+ - [x] **Merkle Trees**: Efficient data structure for transaction verification.
+ - [x] **Console Output**: Pretty-printed tables for transaction and UTXO states.
 
  ## Prerequisites
  - **Rust**: Ensure you have Rust installed. Install it via [rustup](https://rustup.rs/).
@@ -50,31 +50,15 @@
  - `src/node.rs`: Core logic for node behavior (transaction creation, block mining).
  - `src/transaction.rs`: Defines the `Transaction` struct and validation logic.
 
+ ## Fixes
+ - Still fixing the errors
+ - Will soon optimise the code, to make it faster
+ - Naming convention needs to be followed 
+
  ## Contributing
  Feel free to fork this repository and submit pull requests.
  Issues and feature requests are welcome at [https://github.com/bhaskar10h/bitcoin-rust/issues](https://github.com/bhaskar10h/bitcoin-rust/issues).
- ## License
- This project is open-source. See the [LICENSE](LICENSE) file for details (if applicable; add a license file if needed).
 
  ## Acknowledgments
  - Inspired by [RajputGarima/Bitcoin](https://github.com/RajputGarima/Bitcoin).
  - Thanks to the Rust community for excellent tools and libraries.
-
- ## Contact
- - GitHub: [bhaskar10h](https://github.com/bhaskar10h)
- - Date Created: August 14, 2025
-
-
- Cargo.toml dependencies (add to a separate Cargo.toml file)
- [package]
- name = "bitcoin-rust"
- version = "0.1.0"
- edition = "2021"
-
- [dependencies]
- rsa = "0.9"
- sha2 = "0.10"
- rand = "0.8"
- prettytable = "0.10"
- lazy_static = "1.4"
- hex = "0.4"
