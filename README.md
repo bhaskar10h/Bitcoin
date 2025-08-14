@@ -35,8 +35,8 @@
 
  ## Usage
  - The program simulates a network of 10 nodes (configurable via `config.rs`).
- - Upon running, it creates a genesis block and initializes nodes with 1000 bitcoins each.
- - Nodes periodically attempt to create transactions (20% chance per second) and mine blocks every 15 seconds.
+ - Upon running, it creates a genesis block and initializes nodes with 1000 bitcoins each (an estimation).
+ - Nodes periodically attempt to create transactions (5% chance per second) and mine blocks every 15 seconds.
  - Output includes transaction tables, UTXO states, and block details printed to the console.
 
  ## Project Structure
