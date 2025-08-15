@@ -52,7 +52,7 @@
 
  ## Fixes
  - Still fixing the errors
- - Will soon optimise the code, to make it faster
+ - Will optimise the code, to make it faster
  - Naming convention needs to be followed 
 
  ## Contributing

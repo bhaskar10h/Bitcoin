@@ -1,5 +1,5 @@
 [package]
-name = "Bitcoin"
+name = "bitcoin"
 version = "0.1.0"
 edition = "2024"
 authors = ["Bhaskar Hemanth <bhaskar96.surya@gmail.com>"]
