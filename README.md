@@ -57,7 +57,7 @@
 
  ## Contributing
  Feel free to fork this repository and submit pull requests.
- Issues and feature requests are welcome at [https://github.com/bhaskar10h/bitcoin-rust/issues](https://github.com/bhaskar10h/bitcoin-rust/issues).
+ Issues and feature requests are welcome at [https://github.com/bhaskar10h/Bitcoin/issues](https://github.com/bhaskar10h/Bitcoin/issues).
 
  ## Acknowledgments
  - Inspired by [RajputGarima/Bitcoin](https://github.com/RajputGarima/Bitcoin).
