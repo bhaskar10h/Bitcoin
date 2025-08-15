@@ -1,11 +1,12 @@
-use crate::bitcoinscript::{ScriptPubKey, ScriptSign, execute_script};
+use crate::bitcoinscript::{ScriptPubkey, ScriptSign, execute_script};
 use crate::hash_algo::generate_hash;
 use sha2::{Digest, Sha256};
 
+#[derive(Clone)]
 pub struct Transaction {
     pub hash_val: String,
     pub input: Vec<((Box<Transaction>, usize), ScriptSign)>,
-    pub output: Vec<(u64, ScriptPubKey)>,
+    pub output: Vec<(u64, ScriptPubkey)>,
     pub valid_txn: bool,
 }
 
@@ -29,7 +30,7 @@ impl Transaction {
         let mut valid_txn = true;
 
         if genesis_block_txn {
-            let script_pubkey = ScriptPubKey::new(
+            let script_pubkey = ScriptPubkey::new(
                 recv_pubkey_hash.clone(),
                 hex::encode(recv_pubkey_hash.clone().finalize()),
             );
@@ -37,7 +38,7 @@ impl Transaction {
 
             (output).iter().for_each(|(val, spk)| {
                 all_hash.push_str(&val.to_string());
-                all_hash.push_str(&spk.public_key_hash_hex());
+                all_hash.push_str(&spk.pubkey_hash_key());
             });
 
             let hash_val = generate_hash(&all_hash);
@@ -51,7 +52,7 @@ impl Transaction {
             };
         }
 
-        let valid_coins = Self::is_valid_txn(&input, amnt);
+        let valid_coins = Self::is_valid_transaction(&input, amnt);
         if valid_coins == -1 {
             let hash_val = generate_hash(&all_hash);
             return Self {
@@ -62,7 +63,7 @@ impl Transaction {
             };
         };
 
-        let script_pubkey = ScriptPubKey::new(
+        let script_pubkey = ScriptPubkey::new(
             recv_pubkey_hash.clone(),
             hex::encode(recv_pubkey_hash.clone().finalize()),
         );
@@ -81,8 +82,8 @@ impl Transaction {
                 }
 
                 if balance_wallet_amnt > 0 {
-                    let sender_pubkey_hash = Sha256::digest(&sign.as_bytes());
-                    let spk = ScriptPubKey::new(
+                    let sender_pubkey_hash = Sha256::digest(&sign.pubkey);
+                    let spk = ScriptPubkey::new(
                         Sha256::new_with_prefix(&sender_pubkey_hash),
                         hex::encode(sender_pubkey_hash),
                     );
@@ -93,11 +94,11 @@ impl Transaction {
 
         output.iter().for_each(|(val, spk)| {
             all_hash.push_str(&val.to_string());
-            all_hash.push_str(&spk.pubkey_hash_hex());
+            all_hash.push_str(&spk.pubkey_hash_key());
         });
         let hash_val = generate_hash(&all_hash);
 
-        output.mut_iter().for_each(|(_, spk)| {
+        output.iter_mut().for_each(|(_, spk)| {
             spk.update_hash(&hash_val);
         });
 
@@ -109,20 +110,20 @@ impl Transaction {
         }
     }
 
-    fn is_valid_txn(input: &Vec<((Box<Self>, usize), ScriptSign)>, amnt: u64) -> i64 {
+    fn is_valid_transaction(inputs: &Vec<((Box<Self>, usize), ScriptSign)>, amount: u64) -> i64 {
         let mut valid_bitcoins: i64 = 0;
-        input.into_iter().for_each(|((txn, idx), script_sign)| {
+        inputs.iter().for_each(|((txn, idx), script_signature)| {
             let txnhash = &txn.hash_val;
             let script_pubkey = txn.output[*idx].1;
 
-            if !execute_script(script_sign, &script_pubkey, txnhash) {
-                return -1;
+            if !execute_script(script_signature, &script_pubkey, txnhash) {
+                ()
             }
 
             valid_bitcoins += txn.output[*idx].0 as i64;
 
-            if valid_bitcoins > amnt as i64 {
-                return -1;
+            if valid_bitcoins > amount as i64 {
+                ()
             }
         });
         valid_bitcoins

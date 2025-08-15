@@ -1,5 +1,6 @@
 use crate::block::Block;
 
+#[derive(Clone)]
 pub struct BlockChain {
     pub latest_block: Option<Block>,
     pub root_block: Option<Block>,

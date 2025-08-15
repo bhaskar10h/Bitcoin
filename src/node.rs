@@ -1,7 +1,11 @@
 use std::{
-    collections::HashMap, sync::{Arc, Mutex}, thread::sleep, time::{Duration, Instant}
+    collections::HashMap,
+    sync::{Arc, Mutex},
+    thread::sleep,
+    time::{Duration, Instant}
 };
 
+use lazy_static::lazy_static;
 use prettytable::{Cell, Row, Table};
 use rand::{Rng, rng};
 use rsa::{pkcs1::EncodeRsaPublicKey, Pkcs1v15Sign, RsaPrivateKey, RsaPublicKey};
@@ -17,6 +21,7 @@ use crate::{
     transaction::Transaction
 };
 
+#[derive(Clone)]
 pub struct Node {
     id: usize,
     pubkey: Vec<RsaPublicKey>,
@@ -38,9 +43,9 @@ impl Node {
         let mut pubkey_map = PUBLIC_KEY_MAP.lock().unwrap();
 
         (0..5).for_each(|i| {
-            let mut rng = rng();
+            let mut range = rng();
             let private_key =
-                RsaPrivateKey::new(&mut rng, 2048).expect("Failed to generate private key");
+                RsaPrivateKey::new(&mut range, 2048).expect("Failed to generate private key");
             let public_key = private_key.to_public_key();
             pubkey.push(public_key.clone());
             pvtkey.push(private_key.clone());
@@ -97,10 +102,10 @@ impl Node {
                                 println!("---------------------- Transactions Performed --------------------------");
                                 let txns_performed = TXNS_PERFORMED.lock().unwrap();
                                 println!("{}", txns_performed);
-                                TXNS_PERFORMED.lock().unwrap().clear_rows;
+                                TXNS_PERFORMED.lock().unwrap().clear_rows();
 
                                 println!("--------------------------------------------------------------------------");
-                                all_nodes.lock().unwrap().iter().for_each(|node| node.lock().unwrap().process_blocks(&blk));
+                                all_nodes.lock().unwrap().iter().for_each(|node| node.lock().unwrap().process_blocks(blk));
                                 println!("--------After Performing the Transaction final state of the Nodes---------");
                                 self.print_utxo(&all_nodes);
 
@@ -133,7 +138,7 @@ impl Node {
             }
 
             let dotxn = rng().random::<f64>();
-            let (txn_flag, mut txn_nodes) = TXN_NODES.lock().unwrap();
+            let (txn_flag, mut txn_nodes) = (TXN_FLAG.lock().unwrap(), TXNS_PERFORMED.lock().unwrap());
             if dotxn <= 0.2 && *txn_flag && !txn_nodes.contains(&self.id) {
                 let mut recv = rng().random_range(0..NO_OF_NODES);
                 while recv == self.id {recv =rng().random_range(0..NO_OF_NODES);  }
@@ -156,7 +161,7 @@ impl Node {
                             let mut hasher = Sha256::new();
                             hasher.update(pubkey_bytes);
                             hasher.update(t.0.hash_val.as_bytes());
-                            let signature = pvtkey.sign(Pkcs1v15Sign::new::<Sha256>(), &hasher.finalize()).expect("Failed to sign");
+                            let signature = pvtkey.sign(Pkcs1v15Sign::new(), &hasher.finalize()).expect("Failed to sign");
                             prev_txn.push((Box::new(t.0), t.1));
                             script_sign.push(ScriptSign {
                                 sign: signature,
@@ -170,7 +175,7 @@ impl Node {
                 let mut recv_hasher = Sha256::new();
                 recv_hasher.update(hex::decode(&recv_key_hash).unwrap());
                 let new_txn = Transaction::new(prev_txn, script_sign, bitcoin_val, &mut recv_hasher, false);
-                TXN_PERFORMED.lock().unwrap().add_row(Row::new(vec![
+                TXNS_PERFORMED.lock().unwrap().add_row(Row::new(vec![
                     Cell::new(&self.id.to_string()),
                     Cell::new(&PUBLIC_KEY_MAP.lock().unwrap()[&recv_key_hash]),
                     Cell::new(&bitcoin_val.to_string()),
@@ -193,15 +198,15 @@ impl Node {
         }
 
         block.txn_list.iter().for_each(|txn| {
-           if !txn.valid_txn { return false;  }                
+           if !txn.valid_txn { ()  }                
            &txn.input.iter().for_each(|inp| {
                let sign = &inp.1.pubkey;
                let mut hasher = Sha256::new();
                hasher.update(sign);
                let sign_hash = generate_hash(&format!("{:x}", hasher.finalize()));
                if let Some(utxo) = self.utxo.get(&sign_hash) {
-                   if !utxo.iter().any(|(txn, idx)| txn.hash_val == inp.0.0.hash_val && *idx == inp.0.1) { return false; } 
-               } else { return false; }
+                   if !utxo.iter().any(|(txn, idx)| txn.hash_val == inp.0.0.hash_val && *idx == inp.0.1) { () } 
+               } else { return () }
            }); 
         });
         true 
@@ -223,7 +228,7 @@ impl Node {
             self.block_chain.root_block = Some(block.clone());
         }
         self.block_chain.latest_block = Some(block.clone());
-        let mut temp_utxo: HashMap<String, Vec<(Transaction, usize)>> = HashMap::new()
+        let mut temp_utxo: HashMap<String, Vec<(Transaction, usize)>> = HashMap::new();
 
         block.txn_list.iter().for_each(|txn| {
             txn.input.iter().for_each(|x| {
@@ -233,9 +238,9 @@ impl Node {
             });
             let mut index = 0;
             txn.output.iter().for_each(|x| {
-                let script_pubkey = x.1.pubkey_hash_hex();
+                let script_pubkey = x.1.pubkey_hash_key();
                 temp_utxo.entry(script_pubkey.clone())
-                         .or_insert_with(Vec::new())
+                         .or_insert_with(|| Vec::new())
                          .push((txn.clone(), index));
                 index += 1; 
             });
@@ -243,7 +248,7 @@ impl Node {
         });
 
         temp_utxo.into_iter().for_each(|(key, val)| {
-            self.utxo.entry(key).or_insert_with(Vec::new()).extend(val);
+            self.utxo.entry(key).or_insert_with(|| Vec::new()).extend(val);
         });
         self.start = Instant::now();
     }
@@ -265,7 +270,7 @@ impl Node {
         let root_merkle_tree = self.generate_merkle_tree(&txn);
         let blk = Block::new(self.block_chain.latest_block.clone(), root_merkle_tree, self.generate_nonce(), txn);
         for node in all_nodes.lock().unwrap().iter() {
-            node.lock().unwrap().process_blocks(&blk);
+            node.lock().unwrap().process_blocks(blk);
         }
         self.transaction.clear();
     }
@@ -295,6 +300,7 @@ impl Node {
         childs[0].0.clone()
     }
 
+    
     pub fn proof_of_work(&self, all_nodes: &Arc<Mutex<Vec<Arc<Mutex<Node>>>>>) -> bool {
         for node in all_nodes.lock().unwrap().iter() {
             let node = node.lock().unwrap();
@@ -310,7 +316,42 @@ impl Node {
         true
     }
 
-    pub fn print_txn(&self, txn_list: &[Transaction]) {
+    
+    pub fn process_blocks(&mut self, block: Block) {
+            if self.block_chain.root_block.is_none() {
+                self.block_chain.root_block = Some(block.clone());
+            }
+
+            self.block_chain.latest_block = Some(block.clone());
+            let mut temp_unspent_outputs: std::collections::HashMap<String, Vec<(Transaction, usize)>> = std::collections::HashMap::new();
+
+            for txns in &block.txn_list {
+                for x in &txns.input {
+                    let index = x.0.1;
+                    let script_pub_key = x.0.0.output[index].1.pubkey_hash_key();
+                    self.utxo.remove(&script_pub_key);
+                }
+                let mut index = 0;
+                for x in &txns.output {
+                    let script_pub_key = x.1.pubkey_hash_key();
+                    temp_unspent_outputs.entry(script_pub_key.clone())
+                        .or_insert_with(Vec::new)
+                        .push((txns.clone(), index));
+                    index += 1;
+                }
+
+                self.transaction.retain(|t| t.hash_val != txns.hash_val);
+            }
+
+            for (key, val) in temp_unspent_outputs {
+                self.utxo.entry(key)
+                    .or_insert_with(Vec::new)
+                    .extend(val);
+            }
+            self.start = Instant::now();
+        }
+
+    pub fn print_txn(&self, txn_list: &Arc<Mutex<Vec<Arc<Mutex<Transaction>>>>>) {
         let mut txns_executed = Table::new();
         txns_executed.add_row(Row::new(vec![
             Cell::new("ID"),
@@ -319,8 +360,8 @@ impl Node {
             Cell::new("Amount"),
         ]));
 
-        for (i, txn) in txn_list.iter().enumerate() {
-            for inp in &txn.input {
+        for (i, txn) in txn_list.lock().unwrap().iter().enumerate() {
+            for inp in &txn.lock().unwrap().input {
                 let wallet_amt = inp.0.0.output[inp.0.1].0;
                 let mut hasher = Sha256::new();
                 hasher.update(&inp.1.pubkey);
@@ -332,9 +373,9 @@ impl Node {
                     Cell::new(&wallet_amt.to_string()),
                 ]));
             }
-            for otp in &txn.output {
+            for otp in &txn.lock().unwrap().output {
                 let wallet_amt = otp.0;
-                let pub_key_hash = otp.1.pubkey_hash_hex();
+                let pub_key_hash = otp.1.pubkey_hash_key();
                 txns_executed.add_row(Row::new(vec![
                     Cell::new(&i.to_string()),
                     Cell::new("OUT"),
@@ -381,7 +422,7 @@ impl Node {
 }
 
 
-lazy_static::lazy_static! {
+lazy_static! {
     static ref ALL_NODES: Arc<Mutex<Vec<Arc<Mutex<Node>>>>> = Arc::new(Mutex::new(Vec::new()));
     static ref TXN_FLAG: Arc<Mutex<bool>> = Arc::new(Mutex::new(true));
     static ref TXN_NODES: Arc<Mutex<Vec<usize>>> = Arc::new(Mutex::new(Vec::new()));
@@ -396,6 +437,5 @@ lazy_static::lazy_static! {
         table
     }));
     static ref PUBLIC_KEY_MAP: Arc<Mutex<std::collections::HashMap<String, String>>> = Arc::new(Mutex::new(std::collections::HashMap::new()));
-
-}
+}    
 

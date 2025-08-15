@@ -7,6 +7,7 @@ use std::{cell::RefCell, rc::Rc};
 
 type BlockPtr = Option<Rc<RefCell<Block>>>;
 
+#[derive(Clone)]
 pub struct Block {
     pub prev_block: BlockPtr,
     pub prev_block_hash: String,
