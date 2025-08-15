@@ -1,7 +1,11 @@
 [package]
-name = "bitcoin"
+name = "Bitcoin"
 version = "0.1.0"
 edition = "2024"
+authors = ["Bhaskar Hemanth <bhaskar96.surya@gmail.com>"]
+repository = "https://github.com/bhaskar10h/Bitcoin"
+description = "A Rust-based implementation of a simplified Bitcoin-like blockchain system, inspired by the work of RajputGarima/Bitcoin."
+rust-version = "1.89.0"
 
 [dependencies]
 hex = "0.4.3"
