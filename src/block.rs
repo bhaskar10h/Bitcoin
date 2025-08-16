@@ -1,11 +1,13 @@
+use std::sync::{Arc, Mutex};
+
 use crate::config::ARITY;
 use crate::hash_algo::generate_hash;
 use crate::merkle_node::MerkleNode;
 use crate::transaction::Transaction;
 
-use std::{cell::RefCell, rc::Rc};
+// use std::{cell::RefCell, rc::Rc};
 
-type BlockPtr = Option<Rc<RefCell<Block>>>;
+type BlockPtr = Option<Arc<Mutex<Block>>>;
 
 #[derive(Clone)]
 pub struct Block {
@@ -26,7 +28,7 @@ impl Block {
         txn_list: Vec<Transaction>,
     ) -> Self {
         let prev_block_hash = if let Some(ref prev) = prev_block {
-            prev.borrow().hash_val.to_string()
+            prev.lock().unwrap().hash_val.to_string()
         } else {
             String::new()
         };

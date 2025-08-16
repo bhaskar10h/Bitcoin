@@ -20,7 +20,7 @@ version = "0.1.0"
 dependencies = [
  "hex",
  "lazy_static",
- "prettytable",
+ "prettytable-rs",
  "rand 0.9.2",
  "rand_core 0.9.3",
  "rsa",
@@ -335,10 +335,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "prettytable"
+name = "prettytable-rs"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46480520d1b77c9a3482d39939fcf96831537a250ec62d4fd8fbdf8e0302e781"
+checksum = "eea25e07510aa6ab6547308ebe3c036016d162b8da920dbb079e3ba8acf3d95a"
 dependencies = [
  "csv",
  "encode_unicode",
