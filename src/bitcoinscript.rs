@@ -1,4 +1,4 @@
-use rsa::{RsaPublicKey, pkcs1::DecodeRsaPublicKey, traits::PaddingScheme};
+use rsa::{PaddingScheme, RsaPublicKey, pkcs1::DecodeRsaPublicKey};
 use sha2::{Digest, Sha256};
 
 #[derive(Clone, Copy)]
@@ -15,6 +15,14 @@ impl ScriptPubkey {
             pubkey_hash: recvkey_hash,
             recvkey_hash,
         }
+    }
+
+    pub fn update_hash(&mut self, hash_val: &str) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(hash_val.as_bytes());
+        let new_hash = hasher.finalize();
+        self.pubkey_hash.copy_from_slice(&new_hash[..32]);
+        hex::encode(&self.pubkey_hash)
     }
 
     pub fn pubkey_hash_key(&self) -> String {

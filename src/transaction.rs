@@ -14,7 +14,7 @@ impl Transaction {
     pub fn new(
         prev_txn: Vec<(Box<Self>, usize)>,
         script_sign: Vec<ScriptSign>,
-        mut amnt: u64,
+        amnt: u64,
         recv_pubkey_hash: &mut Sha256,
         genesis_block_txn: bool,
     ) -> Self {
@@ -27,7 +27,7 @@ impl Transaction {
         let input: Vec<((Box<Self>, usize), ScriptSign)> =
             prev_txn.into_iter().zip(script_sign).collect();
         let mut output = Vec::new();
-        let mut valid_txn = true;
+        let valid_txn = true;
 
         if genesis_block_txn {
             let script_pubkey = ScriptPubkey::new(
@@ -36,7 +36,7 @@ impl Transaction {
             );
             output.push((amnt, script_pubkey));
 
-            (output).iter().for_each(|(val, spk)| {
+            output.iter().for_each(|(val, spk)| {
                 all_hash.push_str(&val.to_string());
                 all_hash.push_str(&spk.pubkey_hash_key());
             });
@@ -69,17 +69,12 @@ impl Transaction {
         );
         output.push((amnt, script_pubkey));
 
+        let mut remaining_amnt = amnt;
         if valid_coins > amnt as i64 {
             input.iter().for_each(|((txn, idx), sign)| {
-                let mut wallet_amnt = txn.output[*idx].0;
-                let mut paid_amnt = 0;
-                let mut balance_wallet_amnt = wallet_amnt;
-
-                if amnt > 0 {
-                    paid_amnt = wallet_amnt.min(amnt);
-                    balance_wallet_amnt -= paid_amnt;
-                    amnt -= paid_amnt;
-                }
+                let wallet_amnt = txn.output[*idx].0;
+                let paid_amnt = wallet_amnt.min(remaining_amnt);
+                let balance_wallet_amnt = wallet_amnt - paid_amnt;
 
                 if balance_wallet_amnt > 0 {
                     let sender_pubkey_hash = Sha256::digest(&sign.pubkey);
@@ -89,6 +84,7 @@ impl Transaction {
                     );
                     output.push((balance_wallet_amnt, spk));
                 }
+                remaining_amnt = remaining_amnt.saturating_sub(paid_amnt);
             });
         }
 
@@ -131,9 +127,16 @@ impl Transaction {
 
     pub fn get_size(&self) -> usize {
         let mut total_size = 0;
-        total_size += self.hash_val.len();
-        total_size += std::mem::size_of_val(&self.input);
-        total_size += std::mem::size_of_val(&self.output);
+        total_size += self.hash_val.len(); // Hash as string
+        for ((_, _), script_sign) in &self.input {
+            total_size += 8; // Approx size of usize for index
+            total_size += script_sign.sign.len(); // Signature size
+            total_size += script_sign.pubkey.len(); // Public key size
+        }
+        for (_amount, script_pubkey) in &self.output {
+            total_size += 8; // u64 amount
+            total_size += script_pubkey.pubkey_hash.len(); // 32 bytes for pubkey_hash
+        }
         total_size
     }
 }
