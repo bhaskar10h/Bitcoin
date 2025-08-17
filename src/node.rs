@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
     thread::sleep,
     time::{Duration, Instant},
@@ -246,43 +246,49 @@ impl Node {
                     .for_each(|node| node.lock().unwrap().process_transactions(&new_txn));
             }
 
-            drop(txn_flag);
-            drop(txn_nodes);
+            // drop(txn_flag);
+            // drop(txn_nodes);
             sleep(Duration::from_secs(1));
         }
     }
 
     pub fn get_consensus(&self, block: &Block) -> bool {
-        if self
+        let latest_block_hash = self
             .block_chain
             .latest_block
             .as_ref()
-            .map_or(true, |b| b.hash_val != block.prev_block_hash)
-        {
-            return false;
+            .map(|b| b.hash_val.clone());
+
+        if latest_block_hash.as_deref() != Some(&block.prev_block_hash) {
+            if !(self.block_chain.latest_block.is_none() && block.prev_block_hash.is_empty()) {
+                return false;
+            }
         }
 
-        block.txn_list.iter().for_each(|txn| {
+        for txn in &block.txn_list {
             if !txn.valid_txn {
-                ()
+                return false;
             }
-            &txn.input.iter().for_each(|inp| {
-                let sign = &inp.1.pubkey;
-                let mut hasher = Sha256::new();
-                hasher.update(sign);
-                let sign_hash = generate_hash(&format!("{:x}", hasher.finalize()));
-                if let Some(utxo) = self.utxo.get(&sign_hash) {
-                    if !utxo
-                        .iter()
-                        .any(|(txn, idx)| txn.hash_val == inp.0.0.hash_val && *idx == inp.0.1)
-                    {
-                        ()
-                    }
-                } else {
-                    return ();
+            if txn.valid_txn {
+                continue;
+            }
+
+            for inp in &txn.input {
+                let prev_txn = &inp.0.0;
+                let output_idx = inp.0.1;
+                let script_pubkey = prev_txn.output[output_idx].1.pubkey_hash_key();
+
+                let utxo_exists = self.utxo.get(&script_pubkey).map_or(false, |utxo_list| {
+                    utxo_list.iter().any(|(utxo_txn, idx)| {
+                        utxo_txn.hash_val == prev_txn.hash_val && *idx == output_idx
+                    })
+                });
+
+                if !utxo_exists {
+                    return false;
                 }
-            });
-        });
+            }
+        }
         true
     }
 
@@ -290,8 +296,7 @@ impl Node {
         let mut rng = OsRng;
         let mut buffer = [0u8; 8];
         rng.fill_bytes(&mut buffer);
-        let (_, nonce) = buffer.split_at(std::mem::size_of::<u64>());
-        u64::from_be_bytes(nonce.try_into().unwrap()) % 2u64.pow(SIZE_OF_NONCE as u32)
+        u64::from_be_bytes(buffer) % 2u64.pow(SIZE_OF_NONCE as u32)
     }
 
     pub fn process_transactions(&mut self, txn: &Transaction) {
@@ -301,20 +306,24 @@ impl Node {
     }
 
     pub fn create_genesis_block(&mut self, all_nodes: Arc<Mutex<Vec<Arc<Mutex<Node>>>>>) {
-        let bitcoin_value = 1000;
+        let bitcoin_val = 1000;
         for _ in 0..NO_OF_NODES {
-            let random_no = rng().random_range(0..NO_OF_NODES);
-            let rand_key_no = rng().random_range(0..5);
-            let node = all_nodes.lock().unwrap()[random_no].lock().unwrap();
-            let pub_key_bytes = node.pubkey[rand_key_no]
-                .to_pkcs1_der()
-                .expect("Failed to export public key")
-                .as_ref();
-            let mut recvr_pubkey_hash = Sha256::new();
-            recvr_pubkey_hash.update(pub_key_bytes);
-            let t1 = Transaction::new(vec![], vec![], bitcoin_value, &mut recvr_pubkey_hash, true);
+            let random_val = rng().random_range(0..NO_OF_NODES);
+            let random_keyno = rng().random_range(0..5);
+            let pubkey_bytes = {
+                let all = all_nodes.lock().unwrap();
+                let node = all[random_val].lock().unwrap();
+                node.pubkey[random_keyno]
+                    .to_pkcs1_der()
+                    .expect("Failed to export public key")
+            };
+
+            let mut recv_pubkey_hash = Sha256::new();
+            recv_pubkey_hash.update(&pubkey_bytes);
+            let t1 = Transaction::new(vec![], vec![], bitcoin_val, &mut recv_pubkey_hash, true);
             self.transaction.push(t1);
         }
+
         let txn = self.transaction.clone();
         let root_merkle_tree = self.generate_merkle_tree(&txn);
         let blk = Block::new(
@@ -323,8 +332,9 @@ impl Node {
             self.generate_nonce(),
             txn,
         );
+
         for node in all_nodes.lock().unwrap().iter() {
-            node.lock().unwrap().process_blocks(blk);
+            node.lock().unwrap().process_blocks(blk.clone());
         }
         self.transaction.clear();
     }
@@ -376,36 +386,40 @@ impl Node {
     }
 
     pub fn process_blocks(&mut self, block: Block) {
+        let block_arc = Arc::new(Mutex::new(block.clone()));
         if self.block_chain.root_block.is_none() {
-            self.block_chain.root_block = Some(block.clone());
+            self.block_chain.root_block = Some(block_arc.lock().unwrap().clone());
         }
+        self.block_chain.latest_block = Some(block_arc.lock().unwrap().clone());
 
-        self.block_chain.latest_block = Some(block.clone());
-        let mut temp_unspent_outputs: std::collections::HashMap<String, Vec<(Transaction, usize)>> =
-            std::collections::HashMap::new();
+        for txn in &block.txn_list {
+            if !txn.valid_txn {
+                for input in &txn.input {
+                    let prev_txn_box = &input.0.0;
+                    let output_idx = input.0.1;
+                    let script_pubkey = prev_txn_box.output[output_idx].1.pubkey_hash_key();
 
-        for txns in &block.txn_list {
-            for x in &txns.input {
-                let index = x.0.1;
-                let script_pub_key = x.0.0.output[index].1.pubkey_hash_key();
-                self.utxo.remove(&script_pub_key);
-            }
-            let mut index = 0;
-            for x in &txns.output {
-                let script_pub_key = x.1.pubkey_hash_key();
-                temp_unspent_outputs
-                    .entry(script_pub_key.clone())
-                    .or_insert_with(Vec::new)
-                    .push((txns.clone(), index));
-                index += 1;
+                    if let Some(utxo_vec) = self.utxo.get_mut(&script_pubkey) {
+                        utxo_vec.retain(|(utxo_txn, utxo_idx)| {
+                            !(utxo_txn.hash_val == prev_txn_box.hash_val && *utxo_idx == output_idx)
+                        });
+                    }
+                }
             }
 
-            self.transaction.retain(|t| t.hash_val != txns.hash_val);
+            for (index, output) in txn.output.iter().enumerate() {
+                let script_pubkey = output.1.pubkey_hash_key();
+                self.utxo
+                    .entry(script_pubkey)
+                    .or_default()
+                    .push((txn.clone(), index));
+            }
         }
 
-        for (key, val) in temp_unspent_outputs {
-            self.utxo.entry(key).or_insert_with(Vec::new).extend(val);
-        }
+        let processed_txn_hashes: HashSet<_> = block.txn_list.iter().map(|t| &t.hash_val).collect();
+        self.transaction
+            .retain(|t| !processed_txn_hashes.contains(&t.hash_val));
+
         self.start = Instant::now();
     }
 
