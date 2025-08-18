@@ -1,4 +1,4 @@
-use crate::bitcoinscript::{execute_script, ScriptPubkey, ScriptSign};
+use crate::bitcoinscript::{ScriptPubkey, ScriptSign, execute_script};
 use crate::hash_algo::generate_hash;
 use sha2::{Digest, Sha256};
 
@@ -49,7 +49,7 @@ impl Transaction {
         }
 
         let total_input_value = Self::get_total_input_value(&input);
-        if total_input_value < 0 || total_input_value as u64 < amnt {
+        if total_input_value < 0 || (total_input_value as u64) < amnt {
             return Self {
                 hash_val: String::new(),
                 input,
@@ -62,10 +62,8 @@ impl Transaction {
         let script_pubkey = ScriptPubkey::new(&recv_pubkey_hash.clone().finalize().into());
         output.push((amnt, script_pubkey));
 
-        // Create change transaction if inputs are greater than the amount spent.
         let change = total_input_value as u64 - amnt;
         if change > 0 {
-            // Assuming the first input's pubkey is the sender to return change to.
             if let Some(((_, _), sign)) = input.first() {
                 let sender_pubkey_hash_bytes: [u8; 32] = Sha256::digest(&sign.pubkey).into();
                 let spk = ScriptPubkey::new(&sender_pubkey_hash_bytes);
@@ -107,7 +105,7 @@ impl Transaction {
         let mut total_size = 0;
         total_size += self.hash_val.len();
         for ((_, _), script_sign) in &self.input {
-            total_size += 8; // for usize
+            total_size += 8;
             total_size += script_sign.sign.len();
             total_size += script_sign.pubkey.len();
         }

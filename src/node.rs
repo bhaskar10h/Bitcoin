@@ -131,7 +131,7 @@ impl Node {
                                 .lock()
                                 .unwrap()
                                 .iter()
-                                .for_each(|node| node.lock().unwrap().process_blocks(blk));
+                                .for_each(|node| node.lock().unwrap().process_blocks(blk.clone()));
                             println!(
                                 "--------After Performing the Transaction final state of the Nodes---------"
                             );
@@ -153,10 +153,9 @@ impl Node {
                             let mut recv_pubkey_hash = Sha256::new();
                             let pubkey_bytes = self.pubkey[randkeyno]
                                 .to_pkcs1_der()
-                                .expect("Failed to export public key")
-                                .as_ref();
+                                .expect("Failed to export public key");
                             recv_pubkey_hash.update(pubkey_bytes);
-                            let recv_pubkey_hash_str = generate_hash(&format!(
+                            let _recv_pubkey_hash_str = generate_hash(&format!(
                                 "{:x}",
                                 recv_pubkey_hash.clone().finalize()
                             ));
@@ -191,7 +190,7 @@ impl Node {
                 while recv == self.id {
                     recv = rng().random_range(0..NO_OF_NODES);
                 }
-                let recv_node = all_nodes.lock().unwrap()[recv].lock().unwrap();
+                let recv_node = all_nodes.lock().unwrap()[recv].lock().unwrap().clone();
                 let recv_key_hash = recv_node.get_wallet_addr();
                 let mut prev_txn = vec![];
                 let mut script_sign = vec![];
@@ -202,20 +201,20 @@ impl Node {
                     let pubkey_bytes = pubkey
                         .to_pkcs1_der()
                         .expect("Failed to export public key")
-                        .as_ref();
+                        .clone();
                     let mut hasher = Sha256::new();
-                    hasher.update(pubkey_bytes);
+                    hasher.update(&pubkey_bytes);
                     let sender_pubkey_hash = generate_hash(&format!("{:x}", hasher.finalize()));
 
                     if let Some(txn_1) = self.utxo.get(&sender_pubkey_hash) {
                         txn_1.into_iter().for_each(|t| {
                             let mut hasher = Sha256::new();
-                            hasher.update(pubkey_bytes);
+                            hasher.update(&pubkey_bytes);
                             hasher.update(t.0.hash_val.as_bytes());
                             let signature = pvtkey
-                                .sign(Pkcs1v15Sign::new(), &hasher.finalize())
+                                .sign(Pkcs1v15Sign::new::<Sha256>(), &hasher.finalize())
                                 .expect("Failed to sign");
-                            prev_txn.push((Box::new(t.0), t.1));
+                            prev_txn.push((Box::new(t.0.clone()), t.1));
                             script_sign.push(ScriptSign {
                                 sign: signature,
                                 pubkey: pubkey.to_pkcs1_der().unwrap().as_ref().to_vec(),
@@ -257,7 +256,7 @@ impl Node {
             .block_chain
             .latest_block
             .as_ref()
-            .map(|b| b.hash_val.clone());
+            .map(|b| b.lock().unwrap().hash_val.clone());
 
         if latest_block_hash.as_deref() != Some(&block.prev_block_hash) {
             if !(self.block_chain.latest_block.is_none() && block.prev_block_hash.is_empty()) {
@@ -388,9 +387,9 @@ impl Node {
     pub fn process_blocks(&mut self, block: Block) {
         let block_arc = Arc::new(Mutex::new(block.clone()));
         if self.block_chain.root_block.is_none() {
-            self.block_chain.root_block = Some(block_arc.lock().unwrap().clone());
+            self.block_chain.root_block = Some(block_arc.clone());
         }
-        self.block_chain.latest_block = Some(block_arc.lock().unwrap().clone());
+        self.block_chain.latest_block = Some(block_arc.clone());
 
         for txn in &block.txn_list {
             if !txn.valid_txn {

@@ -1,4 +1,9 @@
-use rsa::{PaddingScheme, RsaPublicKey, pkcs1::DecodeRsaPublicKey};
+use rsa::{
+    RsaPublicKey,
+    pkcs1::DecodeRsaPublicKey,
+    pkcs1v15::{Signature, VerifyingKey},
+    signature::DigestVerifier,
+};
 use sha2::{Digest, Sha256};
 
 #[derive(Clone, Copy)]
@@ -67,8 +72,14 @@ pub fn execute_script(
     msg_hasher.update(hash_val.as_bytes());
     let hash_msg = msg_hasher.finalize();
 
-    let padding = PaddingScheme::new_pkcs1v15_sign();
-    match rsa_pub.verify(padding, &hash_msg, signature) {
+    let verifying_key: VerifyingKey<Sha256> = VerifyingKey::new_unprefixed(rsa_pub);
+
+    let sig_obj = match Signature::try_from(signature.as_slice()) {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+
+    match verifying_key.verify_digest(&hash_msg, &sig_obj) {
         Ok(_) => true,
         Err(_) => false,
     }
