@@ -30,7 +30,7 @@ impl Transaction {
         let mut output = Vec::new();
 
         if is_coinbase {
-            let script_pubkey = ScriptPubkey::new(&recv_pubkey_hash.clone().finalize().into());
+            let script_pubkey = ScriptPubkey::new(recv_pubkey_hash.clone());
             output.push((amnt, script_pubkey));
 
             output.iter().for_each(|(val, spk)| {
@@ -59,7 +59,7 @@ impl Transaction {
             };
         }
 
-        let script_pubkey = ScriptPubkey::new(&recv_pubkey_hash.clone().finalize().into());
+        let script_pubkey = ScriptPubkey::new(recv_pubkey_hash.clone());
         output.push((amnt, script_pubkey));
 
         let change = total_input_value as u64 - amnt;
