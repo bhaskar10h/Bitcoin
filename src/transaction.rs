@@ -90,13 +90,12 @@ impl Transaction {
         let mut total_value: i64 = 0;
         inputs.iter().for_each(|((txn, idx), script_signature)| {
             let txnhash = &txn.hash_val;
-            let script_pubkey = &txn.output[*idx].1;
-
+            let script_pubkey = &txn.output[idx].1;
             if !execute_script(script_signature, script_pubkey, txnhash) {
                 false;
                 return;
             }
-            total_value += txn.output[*idx].0 as i64;
+            total_value += txn.output[idx.into()].0 as i64;
         });
         total_value
     }
@@ -104,10 +103,10 @@ impl Transaction {
     pub fn get_size(&self) -> usize {
         let mut total_size = 0;
         total_size += self.hash_val.len();
-        for ((_, _), script_sign) in &self.input {
+        for ((_, _), scriptsign) in &self.input {
             total_size += 8;
-            total_size += script_sign.sign.len();
-            total_size += script_sign.pubkey.len();
+            total_size += scriptsign.sign.len();
+            total_size += scriptsign.pubkey.len();
         }
         for (amount, script_pubkey) in &self.output {
             total_size += std::mem::size_of_val(amount);

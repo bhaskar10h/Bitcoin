@@ -13,7 +13,7 @@ pub struct ScriptPubkey {
 }
 
 impl ScriptPubkey {
-    pub fn new(pubkey_hash: Sha256, _pubkey_hash_hex: String) -> Self {
+    pub fn new(pubkey_hash: Sha256) -> Self {
         let mut recvkey_hash = [0u8; 32];
         recvkey_hash.copy_from_slice(&pubkey_hash.finalize()[..32]);
         Self {
@@ -70,7 +70,7 @@ pub fn execute_script(
 
     let mut msg_hasher = Sha256::new();
     msg_hasher.update(hash_val.as_bytes());
-    let hash_msg = msg_hasher.finalize();
+    let hash_msg = msg_hasher;
 
     let verifying_key: VerifyingKey<Sha256> = VerifyingKey::new_unprefixed(rsa_pub);
 
@@ -79,8 +79,5 @@ pub fn execute_script(
         Err(_) => return false,
     };
 
-    match verifying_key.verify_digest(&hash_msg, &sig_obj) {
-        Ok(_) => true,
-        Err(_) => false,
-    }
+    verifying_key.verify_digest(hash_msg, &sig_obj).is_ok()
 }

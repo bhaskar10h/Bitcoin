@@ -7,11 +7,11 @@ use std::{
 
 use lazy_static::lazy_static;
 use prettytable::{Cell, Row, Table};
-use rand::{rng, Rng};
+use rand::{Rng, rng};
 use rsa::{
+    Pkcs1v15Sign, RsaPrivateKey, RsaPublicKey,
     pkcs1::EncodeRsaPublicKey,
     rand_core::{OsRng, RngCore},
-    Pkcs1v15Sign, RsaPrivateKey, RsaPublicKey,
 };
 use sha2::{Digest, Sha256};
 
@@ -273,8 +273,8 @@ impl Node {
             }
 
             for inp in &txn.input {
-                let prev_txn = &inp.0 .0;
-                let output_idx = inp.0 .1;
+                let prev_txn = &inp.0.0;
+                let output_idx = inp.0.1;
                 let script_pubkey = prev_txn.output[output_idx].1.pubkey_hash_key();
 
                 let utxo_exists = self.utxo.get(&script_pubkey).map_or(false, |utxo_list| {
@@ -394,8 +394,8 @@ impl Node {
         for txn in &block.txn_list {
             if !txn.valid_txn {
                 for input in &txn.input {
-                    let prev_txn_box = &input.0 .0;
-                    let output_idx = input.0 .1;
+                    let prev_txn_box = &input.0.0;
+                    let output_idx = input.0.1;
                     let script_pubkey = prev_txn_box.output[output_idx].1.pubkey_hash_key();
 
                     if let Some(utxo_vec) = self.utxo.get_mut(&script_pubkey) {
@@ -433,7 +433,7 @@ impl Node {
 
         for (i, txn) in txn_list.lock().unwrap().iter().enumerate() {
             for inp in &txn.lock().unwrap().input {
-                let wallet_amt = inp.0 .0.output[inp.0 .1].0;
+                let wallet_amt = inp.0.0.output[inp.0.1].0;
                 let mut hasher = Sha256::new();
                 hasher.update(&inp.1.pubkey);
                 let pub_key_hash = generate_hash(&format!("{:x}", hasher.finalize()));
