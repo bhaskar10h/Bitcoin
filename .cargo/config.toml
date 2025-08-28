@@ -1,0 +1,9 @@
+# .cargo/config.toml
+
+[build]
+rustflags = [
+  "-A", "unused_imports",
+  "-A", "dead_code",
+  "-A", "unused_variables",
+  "-A", "warnings", 
+]
