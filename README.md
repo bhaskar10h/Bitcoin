@@ -63,3 +63,7 @@
  ## Acknowledgments
  - Inspired by [RajputGarima/Bitcoin](https://github.com/RajputGarima/Bitcoin).
  - Thanks to the Rust community for excellent tools and libraries.
+
+ ## Previous Branch
+ I had a conflict with my previous branch due to an unused account being configured,
+ So, I deleted it and rebranded this repo with the original author' user.name 
